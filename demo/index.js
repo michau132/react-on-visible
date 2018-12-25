@@ -3,7 +3,7 @@ import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
 import OnVisible, { setDefaultProps } from '../src/index.js';
 
-const NUM_ITEMS = 2000; // TODO: ПИЗДА
+const NUM_ITEMS = 2000; // TODO: TOO MUCH
 const root = document.querySelector('#root');
 
 setDefaultProps({
