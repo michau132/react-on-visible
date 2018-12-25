@@ -3,7 +3,7 @@ import React, { Component } from 'react';
 import ReactDOM from 'react-dom';
 import OnVisible, { setDefaultProps } from '../src/index.js';
 
-const NUM_ITEMS = 360;
+const NUM_ITEMS = 2000; // TODO: ПИЗДА
 const root = document.querySelector('#root');
 
 setDefaultProps({
@@ -14,7 +14,7 @@ class Colors extends Component {
     constructor(...args) {
         super(...args);
         this.renderItem = this.renderItem.bind(this);
-        this.udpateVis = this.updateVis.bind(this);
+        // this.udpateVis = this.updateVis.bind(this);
 
         const colors = new Array(NUM_ITEMS).fill('')
             .map((_, idx) => {
@@ -30,7 +30,7 @@ class Colors extends Component {
         };
     }
     updateVis(idx, visible) {
-        setTimeout(() => {
+        // setTimeout(() => {
             const colors = this.state.colors;
 
             colors[idx] = Object.assign(colors[idx], {visible});
@@ -38,7 +38,7 @@ class Colors extends Component {
             this.setState({
                 colors
             });
-        }, 1200);
+        // }, 1200);
     }
     renderItem(item, idx) {
         const col = this.state.colors[idx];

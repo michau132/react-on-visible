@@ -4,38 +4,100 @@ import PropTypes from 'prop-types';
 import {bindRaf} from './lib/bindRaf';
 import cx from 'classnames';
 
+function getCoords(box) { // crossbrowser version
+    const body = document.body;
+    const docEl = document.documentElement;
+    const scrollTop = window.pageYOffset || docEl.scrollTop || body.scrollTop;
+    const scrollLeft = window.pageXOffset || docEl.scrollLeft || body.scrollLeft;
+    const clientTop = docEl.clientTop || body.clientTop || 0;
+    const clientLeft = docEl.clientLeft || body.clientLeft || 0;
+    const top = box.top + scrollTop - clientTop;
+    const left = box.left + scrollLeft - clientLeft;
+
+    return {
+        top: Math.round(top),
+        left: Math.round(left)
+    };
+}
+
+const throttle = (func, limit) => {
+    let inThrottle
+    return function() {
+      const args = arguments
+      const context = this
+      if (!inThrottle) {
+        func.apply(context, args)
+        inThrottle = true
+        setTimeout(() => inThrottle = false, limit)
+      }
+    }
+  }
+
+// Make a singleton observer instead of binding many listeners to window.
+function Observer() {
+    this.listeners = [];
+
+    return {
+        addEventListener: (listener) => {
+            this.listeners.push(listener);
+        },
+        removeEventListener: (listenerToRemove) => this.listeners
+            .filter((savedListener) => savedListener !== listenerToRemove),
+        handler: throttle(() => {
+            console.time('scroll');
+            const pos = window.pageYOffset + window.innerHeight
+            this.listeners
+                .forEach((listener) => listener(pos));
+            console.timeEnd('scroll');
+        }, 100)
+    };
+}
+
+const scrollObserver = new Observer();
+// const resizeObserver = new Observer();
+
+window.addEventListener('scroll', scrollObserver.handler);
+// window.addEventListener('resize', resizeObserver.handler); // TODO: re-calculate boxTop & boxHeight
+
 class OnVisible extends Component {
     constructor(...args) {
         super(...args);
-        this.onScroll = bindRaf(this.onScroll.bind(this));
+        this.onScrollEnd = this.onScrollEnd.bind(this);
+        // this.onScroll = bindRaf(this.onScroll.bind(this));
         this.state = {
+            visbleTriggerRatio: (this.props.percent && this.props.percent / 100), // to not caclulate it in each scroll handler
             visible: false,
             bottom: 0,
             top: 0
         };
     }
     componentDidMount() {
-        this.onScroll();
-        window.addEventListener('scroll', this.onScroll);
-        window.addEventListener('resize', this.onScroll);
+        // Cache size and absolute offset
+        setTimeout(() => {
+            const box = this.holder.getBoundingClientRect();
+
+            this.boxHeight = box.height;
+            this.boxTop = getCoords(box).top;
+            this.onScroll();
+        }, 0);
+
+        scrollObserver.addEventListener(this.onScroll.bind(this));
+        // window.addEventListener('resize', this.onScroll);
     }
     componentWillUnmount() {
         this.stopListening();
     }
-    onScroll() {
-        const pos = window.pageYOffset + window.innerHeight;
-        const visbleTriggerRatio = (this.props.percent && this.props.percent / 100) || 0.5;
-        const box = this.holder.getBoundingClientRect();
 
-        const pageYOffset = window.pageYOffset || document.documentElement.scrollTop;
-        const docTop = document.documentElement.clientTop || 0;
+    // Do not create functions in onScroll handler
+    onScrollEnd(visible) {
+        return () => this.props.onChange(visible);
+    }
 
-        const top = box.top + (box.height * visbleTriggerRatio) + (pageYOffset - docTop);
-        const visible = top < pos;
-        const end = () => {
-            this.props.onChange(visible);
-        };
-
+    onScroll(pos) {
+        const {boxTop, boxHeight} = this;
+        const top = boxTop + (boxHeight * this.state.visbleTriggerRatio);
+        const ppos = pos ? pos : window.pageYOffset + window.innerHeight;
+        const visible = top < ppos;
         const somethingChanged = this.state.visible !== visible;
         const becameVisible = visible && !this.state.visible;
 
@@ -43,16 +105,17 @@ class OnVisible extends Component {
             this.setState(() => ({
                 visible,
                 top
-            }), end);
+            }), this.onScrollEnd(visible));
         }
 
         if (becameVisible && !this.props.bounce) {
             this.stopListening();
         }
     }
+
     stopListening() {
-        window.removeEventListener('scroll', this.onScroll);
-        window.removeEventListener('resize', this.onScroll);
+        scrollObserver.removeEventListener('scroll', this.onScroll);
+        // window.removeEventListener('resize', this.onScroll);
     }
     render() {
         const {className, visibleClassName, children, wrappingElement, ...attributes} = this.props;
@@ -81,7 +144,8 @@ class OnVisible extends Component {
 OnVisible.defaultProps = {
     onChange: () => {}, // eslint-disable-line no-empty-function
     bounce: false,
-    wrappingElement: 'div'
+    wrappingElement: 'div',
+    percent: 50
 };
 
 OnVisible.propTypes = {
